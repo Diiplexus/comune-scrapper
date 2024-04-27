@@ -13,6 +13,8 @@ type Commune struct {
 	name         string
 	link         string
 	contactEmail string
+	population   string
+	officialSite string
 }
 type Province struct {
 	name string
@@ -31,6 +33,10 @@ var ProvinceList = []Province{
 	{
 		name: "Brescia",
 		link: "http://www.comuni-italiani.it/017/",
+	},
+	{
+		name: "Milano",
+		link: "http://www.comuni-italiani.it/015/",
 	},
 	{
 		name: "Monza_e_della_Brianza",
@@ -55,12 +61,6 @@ var ProvinceList = []Province{
 }
 
 func main() {
-	// for _, province := range ProvinceList {
-	// 	csvName, done := createCommunesCSV(province)
-	// 	if done {
-	// 		fromCSVComunesExtractEmailIFExist(csvName, province)
-	// 	}
-	// }
 	var wg sync.WaitGroup
 
 	for _, province := range ProvinceList {
@@ -75,6 +75,7 @@ func main() {
 	}
 
 	wg.Wait()
+	fmt.Println("Done")
 }
 
 func createCommunesCSV(p Province) (string, bool) {
@@ -162,17 +163,19 @@ func fromCSVComunesExtractEmailIFExist(filename string, province Province) {
 			name:         record[0],
 			link:         record[1],
 			contactEmail: "",
+			population:   "",
 		}
 		cE := colly.NewCollector()
-		cE.OnHTML("a:contains('Email Comune')", func(e *colly.HTMLElement) {
-			href := e.Attr("href")
-			fmt.Println("", href)
+		cE.OnHTML("body", func(e *colly.HTMLElement) {
+			comune.population = e.ChildText("tbody:contains('Popolazione Residente') > tr:nth-child(6) > td > b")
+			fmt.Println("Population:", comune.population)
+			href := e.ChildAttr("a:contains('Email Comune')", "href")
 			trimedHref := strings.TrimPrefix(href, "mailto:")
 			fmt.Println(trimedHref)
 			comune.contactEmail = trimedHref
-			record = []string{comune.name, comune.link, comune.contactEmail}
-			fmt.Println("Record:", record)
-			err := writer.Write(record)
+			comune.officialSite = e.ChildAttr("a:contains('Sito ufficiale')", "href")
+			fmt.Println("Official Site:", comune.officialSite)
+			err := writer.Write([]string{comune.name, comune.link, comune.contactEmail, comune.population, comune.officialSite})
 			if err != nil {
 				return
 			}
